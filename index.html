@@ -173,13 +173,23 @@ function processExcel(workbook) {
     exclusivosPorLoc[loc].sort((a, b) => b[2] - a[2]);
   }
 
+  // Qty per SKU per location
+  const qtyPorSkuLoc = {};
+  for (const r of rows) {
+    if (excluir.has(r.loc)) continue;
+    if (!qtyPorSkuLoc[r.sku]) qtyPorSkuLoc[r.sku] = {};
+    qtyPorSkuLoc[r.sku][r.loc] = (qtyPorSkuLoc[r.sku][r.loc] || 0) + r.qty;
+  }
+
   const locData = {};
   for (const r of rows) {
+    if (excluir.has(r.loc)) continue;
     const uniqueLocs = [...new Set(skuLocs[r.sku])];
     if (uniqueLocs.length <= 1) continue;
     if (!locData[r.loc]) locData[r.loc] = {};
     if (!locData[r.loc][r.sku]) {
-      locData[r.loc][r.sku] = { qty: 0, desc: r.desc, allLocs: uniqueLocs };
+      const locsWithQty = uniqueLocs.map(l => [l, qtyPorSkuLoc[r.sku][l] || 0]).sort((a, b) => b[1] - a[1]);
+      locData[r.loc][r.sku] = { qty: 0, desc: r.desc, allLocs: locsWithQty };
     }
     locData[r.loc][r.sku].qty += r.qty;
   }
@@ -191,8 +201,8 @@ function processExcel(workbook) {
     const redistSkus = locData[loc] ? Object.entries(locData[loc]) : [];
     const qtyRedist = redistSkus.reduce((s, [,v]) => s + v.qty, 0);
     const allUbis = new Set();
-    for (const [,v] of redistSkus) v.allLocs.forEach(l => allUbis.add(l));
-    const detail = redistSkus.map(([code, v]) => [code, v.desc, v.qty, [...v.allLocs].sort()]).sort((a, b) => b[2] - a[2]);
+    for (const [,v] of redistSkus) v.allLocs.forEach(([loc]) => allUbis.add(loc));
+    const detail = redistSkus.map(([code, v]) => [code, v.desc, v.qty, [...v.allLocs]]).sort((a, b) => b[2] - a[2]);
     const exclusivos = exclusivosPorLoc[loc] || [];
     items.push({ loc, total_skus: totalSkusUbi, skus_redist: redistSkus.length, skus_exclusivos: totalSkusUbi - redistSkus.length, total_qty: qtyRedist, total_ubis: allUbis.size, skus_detail: detail, skus_exclusivos_list: exclusivos });
   }
@@ -237,7 +247,7 @@ function render(items) {
               <span class="sku-code">${code}</span>
               <span class="sku-desc">${desc}</span>
               <span class="sku-qty">${qty} uds</span>
-              <div class="sku-locs">Ya existe en: ${allLocs.map(l => '<span>' + l + '</span>').join('')}</div>
+              <div class="sku-locs">Ya existe en: ${allLocs.map(([loc, lqty]) => '<span>' + loc + ' (' + lqty + ')</span>').join('')}</div>
             </div>`;
           }).join('')}
           ${item.skus_exclusivos_list && item.skus_exclusivos_list.length > 0 ? `
@@ -277,7 +287,7 @@ function downloadCSV(loc) {
     ['SKU', 'Descripcion', 'Unidades en ' + loc, 'Ubicaciones donde ya existe']
   ];
   for (const [code, desc, qty, allLocs] of item.skus_detail) {
-    wsData.push([code, desc, qty, allLocs.join(', ')]);
+    wsData.push([code, desc, qty, allLocs.map(([loc, lqty]) => loc + ' (' + lqty + ')').join(', ')]);
   }
   if (item.skus_exclusivos_list && item.skus_exclusivos_list.length) {
     wsData.push([]);
