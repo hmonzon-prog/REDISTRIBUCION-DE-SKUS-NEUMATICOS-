@@ -147,8 +147,10 @@ function processExcel(workbook) {
       rows.push({ loc: String(loc).trim(), sku: String(sku).trim(), qty: Number(qty) || 0, desc: String(desc || '').trim() });
     }
   }
-  const skuLocs = {}, totalSkusPorLoc = {}, excluir = new Set(['PICKTO','ANALISIS','INVNEG0205']);
+  const excluir = new Set(['PICKTO','ANALISIS','INVNEG0205']);
+  const skuLocs = {}, totalSkusPorLoc = {};
   for (const r of rows) {
+    if (excluir.has(r.loc)) continue;
     if (!skuLocs[r.sku]) skuLocs[r.sku] = [];
     skuLocs[r.sku].push(r.loc);
     if (!totalSkusPorLoc[r.loc]) totalSkusPorLoc[r.loc] = new Set();
