@@ -84,7 +84,7 @@ body { font-family: 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; padding
 <body>
 <div class="header">
   <h1>Dashboard de Redistribucion de SKUs</h1>
-  <p class="subtitle" id="statusText">Ubicaciones con 5+ SKUs redistribuibles &mdash; Excluye PICKTO, ANALISIS, INVNEG0205</p>
+  <p class="subtitle" id="statusText">Todas las ubicaciones &mdash; Excluye PICKTO, ANALISIS, INVNEG0205</p>
 </div>
 <div class="drop-zone" id="dropZone">
   <div id="dropContent">Arrastra un nuevo reporte Excel (.xlsx) para actualizar los datos</div>
@@ -185,17 +185,16 @@ function processExcel(workbook) {
   }
 
   const items = [];
-  for (const loc in locData) {
-    if (excluir.has(loc)) continue;
-    const skus = Object.entries(locData[loc]);
-    if (skus.length < 5) continue;
-    const totalSkusUbi = totalSkusPorLoc[loc] ? totalSkusPorLoc[loc].size : 0;
-    const qtyRedist = skus.reduce((s, [,v]) => s + v.qty, 0);
+  const allLocs = Object.keys(totalSkusPorLoc).sort();
+  for (const loc of allLocs) {
+    const totalSkusUbi = totalSkusPorLoc[loc].size;
+    const redistSkus = locData[loc] ? Object.entries(locData[loc]) : [];
+    const qtyRedist = redistSkus.reduce((s, [,v]) => s + v.qty, 0);
     const allUbis = new Set();
-    for (const [,v] of skus) v.allLocs.forEach(l => allUbis.add(l));
-    const detail = skus.map(([code, v]) => [code, v.desc, v.qty, [...v.allLocs].sort()]).sort((a, b) => b[2] - a[2]);
+    for (const [,v] of redistSkus) v.allLocs.forEach(l => allUbis.add(l));
+    const detail = redistSkus.map(([code, v]) => [code, v.desc, v.qty, [...v.allLocs].sort()]).sort((a, b) => b[2] - a[2]);
     const exclusivos = exclusivosPorLoc[loc] || [];
-    items.push({ loc, total_skus: totalSkusUbi, skus_redist: skus.length, skus_exclusivos: totalSkusUbi - skus.length, total_qty: qtyRedist, total_ubis: allUbis.size, skus_detail: detail, skus_exclusivos_list: exclusivos });
+    items.push({ loc, total_skus: totalSkusUbi, skus_redist: redistSkus.length, skus_exclusivos: totalSkusUbi - redistSkus.length, total_qty: qtyRedist, total_ubis: allUbis.size, skus_detail: detail, skus_exclusivos_list: exclusivos });
   }
   items.sort((a, b) => b.skus_redist - a.skus_redist);
   data = items;
@@ -207,25 +206,29 @@ function render(items) {
   const container = document.getElementById('dashboard');
   container.innerHTML = items.map(item => {
     const pct = Math.round(item.skus_redist / maxSkus * 100);
+    const estable = item.skus_redist === 0;
     return `
       <div class="card" data-loc="${item.loc}">
         <div class="card-header">
           <span class="loc-name">${item.loc}</span>
-          <span class="badge">${item.skus_redist} de ${item.total_skus} redistribuibles</span>
+          ${estable
+            ? `<span class="badge" style="background:#e8f5e9;color:#2e7d32;border-color:#a5d6a7;">Ubicacion estable</span>`
+            : `<span class="badge">${item.skus_redist} de ${item.total_skus} redistribuibles</span>`}
         </div>
         <div class="numbers-row">
           <div class="num-block"><div class="num-value">${item.total_skus}</div><span class="num-label">SKUs totales</span></div>
           <div class="num-block"><div class="num-value green">${item.skus_redist}</div><span class="num-label">redistribuibles</span></div>
           <div class="num-block"><div class="num-value gray">${item.skus_exclusivos}</div><span class="num-label">solo aqui</span></div>
         </div>
-        <div class="stats-row">
+        ${estable ? `<div style="margin:6px 0;font-size:13px;color:#2e7d32;font-weight:500;">Todos los SKUs pertenecen solo a esta ubicacion</div>`
+        : `<div class="stats-row">
           <span class="stat">Unidades a redistribuir: <strong>${item.total_qty.toLocaleString()}</strong></span>
           <span class="stat">Ubicaciones destino: <strong>${item.total_ubis}</strong></span>
         </div>
-        <div class="bar-container"><div class="bar" style="width:${pct}%"></div></div>
+        <div class="bar-container"><div class="bar" style="width:${pct}%"></div></div>`}
         <div class="btn-row">
           <button class="toggle-btn" onclick="toggle('${item.loc}')">Ver detalle ▼</button>
-          <button class="download-btn" onclick="downloadCSV('${item.loc}')">Descargar Excel</button>
+          ${!estable ? `<button class="download-btn" onclick="downloadCSV('${item.loc}')">Descargar Excel</button>` : ''}
         </div>
         <div class="sku-list" id="list-${item.loc.replace(/[^a-zA-Z0-9]/g,'')}">
           ${item.skus_detail.map(s => {
