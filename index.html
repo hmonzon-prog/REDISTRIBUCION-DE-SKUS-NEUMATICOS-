@@ -306,43 +306,32 @@ function downloadCSV(loc) {
   if (!item) return;
   const wb = XLSX.utils.book_new();
 
-  // Sheet 1 — Detalle con columna OB para completar
-  const detalleData = [
+  // Sheet unica — Detalle + Exclusivos juntos
+  const wsData = [
     ['SKU', 'Descripcion', 'Unidades en ' + loc, 'OB']
   ];
   for (const [code, desc, qty] of item.skus_detail) {
-    detalleData.push([code, desc, qty, '']);
+    wsData.push([code, desc, qty, '']);
   }
-  const ws1 = XLSX.utils.aoa_to_sheet(detalleData);
-  ws1['!cols'] = [{ wch: 20 }, { wch: 50 }, { wch: 18 }, { wch: 30 }];
-  XLSX.utils.book_append_sheet(wb, ws1, 'Detalle');
-
-  // Sheet 2 — Exclusivos (si hay)
   if (item.skus_exclusivos_list && item.skus_exclusivos_list.length) {
-    const exclData = [
-      ['SKU', 'Descripcion', 'Unidades']
-    ];
+    wsData.push([]);
+    wsData.push(['--- SKUs EXCLUSIVOS (solo en ' + loc + ') ---', '', '', '']);
+    wsData.push(['SKU', 'Descripcion', 'Unidades', '']);
     for (const [code, desc, qty] of item.skus_exclusivos_list) {
-      exclData.push([code, desc, qty]);
+      wsData.push([code, desc, qty, 'EXCLUSIVO']);
     }
-    const ws2 = XLSX.utils.aoa_to_sheet(exclData);
-    ws2['!cols'] = [{ wch: 20 }, { wch: 50 }, { wch: 15 }];
-    XLSX.utils.book_append_sheet(wb, ws2, 'Exclusivos');
   }
+  wsData.push([]);
+  wsData.push(['Resumen']);
+  wsData.push(['SKUs totales en ' + loc, item.total_skus]);
+  wsData.push(['SKUs redistribuibles', item.skus_redist]);
+  wsData.push(['SKUs exclusivos', item.skus_exclusivos]);
+  wsData.push(['Unidades a redistribuir', item.total_qty]);
+  wsData.push(['Ubicaciones destino', item.total_ubis]);
 
-  // Sheet 3 — Resumen
-  const resData = [
-    ['Indicador', 'Valor'],
-    ['SKUs totales en ' + loc, item.total_skus],
-    ['SKUs redistribuibles', item.skus_redist],
-    ['SKUs exclusivos', item.skus_exclusivos],
-    ['Unidades a redistribuir', item.total_qty],
-    ['Ubicaciones destino', item.total_ubis]
-  ];
-  const ws3 = XLSX.utils.aoa_to_sheet(resData);
-  ws3['!cols'] = [{ wch: 35 }, { wch: 10 }];
-  XLSX.utils.book_append_sheet(wb, ws3, 'Resumen');
-
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [{ wch: 20 }, { wch: 50 }, { wch: 18 }, { wch: 30 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Redistribucion');
   XLSX.writeFile(wb, `redistribucion_${loc}.xlsx`);
 }
 
