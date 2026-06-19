@@ -117,6 +117,7 @@ body { font-family: 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; padding
 <button class="filter-btn active" onclick="sortBy('skus_redist')" id="sort-skus_redist">SKUs redistribuibles</button>
 <button class="filter-btn" onclick="sortBy('total_skus')" id="sort-total_skus">SKUs totales</button>
 <button class="filter-btn" onclick="sortBy('total_qty')" id="sort-total_qty">Unidades</button>
+<button class="filter-btn" onclick="sortBy('bajo_stock')" id="sort-bajo_stock">Bajo stock &le;50</button>
 </div>
 <div class="dashboard" id="dashboard"></div>
 <script>
@@ -257,6 +258,7 @@ function render(items) {
         : `<div class="stats-row">
           <span class="stat">Unidades a redistribuir: <strong>${item.total_qty.toLocaleString()}</strong></span>
           <span class="stat">Ubicaciones destino: <strong>${item.total_ubis}</strong></span>
+          ${item._bajo !== undefined ? `<span class="stat">Bajo stock <50: <strong style="color:#e65100">${item._bajo}</strong></span>` : ''}
         </div>
         <div class="bar-container"><div class="bar" style="width:${pct}%"></div></div>`}
         <div class="btn-row">
@@ -378,6 +380,12 @@ function sortBy(type) {
   if (type === 'skus_redist') sorted.sort((a,b) => b.skus_redist - a.skus_redist);
   else if (type === 'total_skus') sorted.sort((a,b) => b.total_skus - a.total_skus);
   else if (type === 'total_qty') sorted.sort((a,b) => b.total_qty - a.total_qty);
+  else if (type === 'bajo_stock') {
+    for (const loc of sorted) {
+      loc._bajo = loc.skus_detail.filter(s => s[2] < 50).length;
+    }
+    sorted.sort((a,b) => b._bajo - a._bajo);
+  }
   render(sorted);
 }
 
